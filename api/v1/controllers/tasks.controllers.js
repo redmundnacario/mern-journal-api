@@ -1,5 +1,5 @@
 const { v4: uuidv4 }  = require('uuid')
-
+const { validationResult } = require('express-validator')
 const HttpError = require('../models/error');
 
 let DUMMY_TASKS = [
@@ -25,6 +25,30 @@ let DUMMY_TASKS = [
         journal_id: 2,
     },
 ]
+
+const errorFormatter = ({ location, msg, param, value, nestedErrors }) => {
+    // Build your resulting errors however you want! String, object, whatever - it works!
+    // return `${location}[${param}]: ${msg}`;
+    if (value == null){
+        return `The '${param}' from the input data is not defined or missing.`;
+    } else if (param === "description" && value.length < 10){
+        return `The length of '${param}' should be greater than 9 characters.`;
+    } else {
+        return `${msg} '${value}' in ${param}`;
+    }
+};
+
+const errorArrayFormater = (errorMap) => {
+    errors = ""
+    for (const error of errorMap) {
+        if (errors == ""){
+            errors = errors + error
+        } else {
+            errors = errors + ". " + error
+        }
+    }
+    return errors
+}
 
 const getAllTasks =(req, res, next) => {
     res.status(200).json(DUMMY_TASKS)
@@ -72,6 +96,13 @@ const getAllTasksByUserId = (req, res, next) => {
 
 // CREATE task
 const createTask = (req,res,next) => {
+    const errors = validationResult(req).formatWith(errorFormatter)
+    const hasErrors = !errors.isEmpty()
+
+    if (hasErrors){
+        return next(new HttpError(errorArrayFormater(errors.array()), 422))
+    }
+
     const {title, description, journal_id, user_id} = req.body
 
     // creat new task data
@@ -91,6 +122,13 @@ const createTask = (req,res,next) => {
 
 // EDIT Task
 const editTask = (req, res, next) => {
+    const errors = validationResult(req).formatWith(errorFormatter)
+    const hasErrors = !errors.isEmpty()
+
+    if (hasErrors){
+        return next(new HttpError(errorArrayFormater(errors.array()), 422))
+    }
+    
     const { title, description } = req.body
     const taskId = req.params.tid
 

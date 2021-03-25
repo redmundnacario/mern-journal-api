@@ -1,4 +1,5 @@
 const express = require('express')
+const {check} = require('express-validator')
 const HttpError = require('../models/error')
 
 const router = express.Router()
@@ -18,10 +19,22 @@ router.get("/journal/:jid", tasksControllers.getAllTasksByJournalId)
 router.get("/user/:uid", tasksControllers.getAllTasksByUserId)
 
 // create
-router.post("/", tasksControllers.createTask)
+router.post("/",
+            [
+                check('title').not().isEmpty(),
+                check('description').isLength({min:10}),
+                check('journal_id').not().isEmpty(),
+                check('user_id').not().isEmpty(),
+            ],
+            tasksControllers.createTask)
 
 // edit
-router.patch("/:tid", tasksControllers.editTask)
+router.patch("/:tid",
+            [
+                check('title').not().isEmpty(),
+                check('description').isLength({min:10})
+            ],
+            tasksControllers.editTask)
 
 //update
 // router.put()
