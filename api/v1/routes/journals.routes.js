@@ -1,5 +1,6 @@
 const express = require('express')
 const HttpError = require('../models/error')
+const { check } = require('express-validator')
 
 const router = express.Router()
 
@@ -14,11 +15,23 @@ router.get("/:jid", journalsControllers.getJournalById)
 // get all journals by a user id
 router.get("/user/:uid", journalsControllers.getAllJournalsByUserId)
 
+
 // create
-router.post("/", journalsControllers.createJournal)
+router.post("/", 
+            [
+                check('title').not().isEmpty(),
+                check('description').isLength({min:10}),
+                check('user_id').not().isEmpty(),
+            ],
+            journalsControllers.createJournal)
 
 // edit
-router.patch("/:jid", journalsControllers.editJournal)
+router.patch("/:jid", 
+            [
+                check('title').not().isEmpty(),
+                check('description').isLength({min:10})
+            ],
+            journalsControllers.editJournal)
 
 //update
 // router.put("/:jid", journalsControllers.updateJournal)

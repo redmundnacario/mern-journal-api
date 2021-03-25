@@ -1,4 +1,6 @@
 const { v4: uuidv4 }  = require('uuid')
+const { validationResult } = require('express-validator')
+
 const HttpError = require('../models/error.js');
 
 let DUMMY_USERS = [
@@ -16,6 +18,29 @@ let DUMMY_USERS = [
     }
 ]
 
+const errorFormatter = ({ location, msg, param, value, nestedErrors }) => {
+    // Build your resulting errors however you want! String, object, whatever - it works!
+    // return `${location}[${param}]: ${msg}`;
+    if (value == null){
+        return `The '${param}' from the input data is not defined or missing.`;
+    } else if (param === "password" || param === "confirmnPassword" && value.length < 7){
+        return `The length of '${param}' should be greater than 6 characters.`;
+    } else {
+        return `${msg} ${value}`;
+    }
+};
+
+const errorArrayFormater = (errorMap) => {
+    errors = ""
+    for (const error of errorMap) {
+        if (errors == ""){
+            errors = errors + error
+        } else {
+            errors = errors + ". " + error
+        }
+    }
+    return errors
+}
 
 const getUsers =(req,res,next) => {
     res.json({users: DUMMY_USERS})
@@ -39,6 +64,13 @@ const signIn = (req,res,next) => {
 }
 
 const signUp = (req,res,next) => {
+    const errors = validationResult(req).formatWith(errorFormatter)
+    const hasErrors = !errors.isEmpty()
+
+    if (hasErrors){
+        return next(new HttpError(errorArrayFormater(errors.array({ onlyFirstError: true })), 422))
+    }
+
     const {name, email, password} = req.body
 
     const hasUser = DUMMY_USERS.find(value => value.email == email)
