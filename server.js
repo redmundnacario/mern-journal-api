@@ -1,6 +1,9 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 
+// MongoDB connect
+const connectDB = require('./config/db')
+connectDB()
 
 // active version
 const ACTIVE_VERSION = "/api/v1"
