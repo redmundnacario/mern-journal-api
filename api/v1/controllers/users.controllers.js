@@ -1,69 +1,65 @@
-const { v4: uuidv4 }  = require('uuid')
 const { validationResult } = require('express-validator')
 
-const HttpError = require('../models/error.js');
 
-let DUMMY_USERS = [
-    {
-        id: "u1",
-        name: "Red",
-        email: "rednacky@gmail.com",
-        password: "123456"
-    },
-    {
-        id: "u2",
-        name: "marge",
-        email: "margy@gmail.com",
-        password: "123456"       
-    }
-]
+// model
+const User = require('../models/users.model')
+const HttpError = require('../models/error')
 
-const errorFormatter = ({ location, msg, param, value, nestedErrors }) => {
-    // Build your resulting errors however you want! String, object, whatever - it works!
-    // return `${location}[${param}]: ${msg}`;
-    if (value == null){
-        return `The '${param}' from the input data is not defined or missing.`;
-    } else if (param === "password" || param === "confirmnPassword" && value.length < 7){
-        return `The length of '${param}' should be greater than 6 characters.`;
-    } else {
-        return `${msg} ${value}`;
-    }
-};
+// helpers
+const {errorFormatter, errorArrayFormater} = require('../helpers/helpers')
 
-const errorArrayFormater = (errorMap) => {
-    errors = ""
-    for (const error of errorMap) {
-        if (errors == ""){
-            errors = errors + error
-        } else {
-            errors = errors + ". " + error
-        }
+
+// @route   GET /users/
+// @desc    Get all users
+// @access  Private
+// @level   Admin
+const getUsers = async(req,res,next) => {
+    let users;
+
+    try {
+        // get all users, excluding the password attribute
+        users = await User.find({},"-password")
+    } catch(error){
+
+        return next(new HttpError("Something went wrong in accessing the users. Try again.", 500))
     }
-    return errors
+
+    if(!users){
+        return next(new HttpError("Users does not exist", 404))
+    }
+
+    res.status(200).json({users: users.map(user => user.toObject({getters: true}))})
 }
 
-const getUsers =(req,res,next) => {
-    res.json({users: DUMMY_USERS})
-}
 
-const signIn = (req,res,next) => {
-    const {email, password} = req.body
+// @route   GET /users/:uid
+// @desc    Get a single user
+// @access  Private
+// @level   Admin
+const getUserbyId = async(req,res,next) => {
+    const userId = req.params.uid
 
-    // find if email is valid user
-    const hasUser = DUMMY_USERS.find(value => value.email == email )
-    // console.log(hasUser)
-    // console.log(hasUser.password !== password)
+    let user;
+    try {
+        // get all users, excluding the password attribute
+        user = await User.findById(userId)
+    } catch(error){
 
-    if (!hasUser || hasUser.password !== password){
-        //throw error
-        const error =new HttpError("Credentials given is incorrect", 422)
-        return next(error )
+        return next(new HttpError("Something went wrong in accessing the user. Try again.", 500))
     }
 
-    res.status(200).json({message: "User successfully signed in."})
+    if(!user){
+        return next(new HttpError("User does not exist.", 404))
+    }
+
+    res.status(200).json({user: user.toObject({getters: true})})
 }
 
-const signUp = (req,res,next) => {
+// @route   PATCH /users/:uid
+// @desc    edit current single user
+// @access  Private
+const editCurrentUser = async(req, res, next) => {
+
     const errors = validationResult(req).formatWith(errorFormatter)
     const hasErrors = !errors.isEmpty()
 
@@ -71,25 +67,75 @@ const signUp = (req,res,next) => {
         return next(new HttpError(errorArrayFormater(errors.array({ onlyFirstError: true })), 422))
     }
 
-    const {name, email, password} = req.body
+    const attributesToChange = req.body
+    const userId = req.user.id
 
-    const hasUser = DUMMY_USERS.find(value => value.email == email)
-
-    if (hasUser) {
-        return next(new HttpError("Account already taken", 422))
+    // update user
+    let result
+    try {
+        attributesToChange.date_updated = Date.now()
+        result = await User.findByIdAndUpdate(userId, attributesToChange, { new: true }).select("-password");
+    } catch (error){
+        return next( new HttpError("Updating user failed. Try again.", 500))
     }
-    const createdUser ={
-        id:uuidv4(),
-        name,
-        email,
-        password
-    }
-    DUMMY_USERS.push(createdUser)
 
-    res.status(201).json({user:createdUser})
+    res.status(200).json({user: result.toObject({getters: true})})
+    // .json({user: userToBeUpdated.toObject({getters:true})})
+}
+
+// @route   PATCH /users/:uid
+// @desc    edit current single user
+// @access  Private
+const editUser = async(req, res, next) => {
+
+    const errors = validationResult(req).formatWith(errorFormatter)
+    const hasErrors = !errors.isEmpty()
+
+    if (hasErrors){
+        return next(new HttpError(errorArrayFormater(errors.array({ onlyFirstError: true })), 422))
+    }
+
+    const attributesToChange = req.body
+    const userId = req.params.uid
+
+    //check if user exist
+    let user;
+    try {
+        // get all users, excluding the password attribute
+        user = await User.findById(userId)
+    } catch(error){
+        console.log(error)
+        return next(new HttpError("Something went wrong in accessing the user. Try again.", 500))
+    }
+
+    if(!user){
+        return next(new HttpError("User does not exist.", 404))
+    }
+
+    // update user
+    
+    try {
+        attributesToChange.date_updated = Date.now()
+        user = await User.findByIdAndUpdate(userId, attributesToChange, { new: true }).select("-password");
+        
+    } catch (error){
+
+        return next( new HttpError("Updating user failed. Try again.", 500))
+    }
+
+
+    res.status(200).json({user: user.toObject({getters: true})})
 }
 
 
+// @route   DELETE /users/:uid
+// @desc    Remove current single user and its contents in other tables
+// @access  Private
+
+
+
+
 exports.getUsers = getUsers
-exports.signIn = signIn
-exports.signUp = signUp
+exports.getUserbyId = getUserbyId
+exports.editCurrentUser = editCurrentUser
+exports.editUser = editUser

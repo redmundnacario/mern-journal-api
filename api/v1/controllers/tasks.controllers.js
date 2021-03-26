@@ -1,6 +1,10 @@
 const { v4: uuidv4 }  = require('uuid')
 const { validationResult } = require('express-validator')
-const HttpError = require('../models/error');
+const HttpError = require('../models/error')
+const mongoose = require('mongoose')
+
+// models
+const Task = require('../models/tasks.model')
 
 let DUMMY_TASKS = [
     {
@@ -50,52 +54,76 @@ const errorArrayFormater = (errorMap) => {
     return errors
 }
 
-const getAllTasks =(req, res, next) => {
-    res.status(200).json(DUMMY_TASKS)
+const getAllTasks = async(req, res, next) => {
+    let tasks
+    try {
+        tasks = await Task.find()
+    } catch (error) {
+        return next(HttpError("Something went wrong in accessing the tasks.",500))
+    }
+
+    res.status(200).json({tasks: tasks.map(task => task.toObject({getters:true}))})
 }
 // GET Task by id
-const getTaskById = (req, res, next) => {
+const getTaskById = async(req, res, next) => {
     const taskId = req.params.tid
     // find Task
-    const hasTask = DUMMY_TASKS.find(value => value.id == taskId )
+    let task
+    try {
+        task = await Task.findById(taskId)
+    } catch (error) {
+        return next(HttpError("Something went wrong in accessing the tasks.",500))
+    }
     // if tasks is undefined or missing
-    if (!hasTask){
+    if (!task){
         return next(new HttpError("Task not found", 404))
     }
     //send response
-    res.status(200).json({...hasTask})
+    res.status(200).json({task: task.toObject({getters:true})})
 }
 
 // GET all Tasks by journal Id
-const getAllTasksByJournalId = (req, res, next) => {
+const getAllTasksByJournalId = async(req, res, next) => {
     const journalId = req.params.jid
 
     // filter dummy data
-    const tasks = DUMMY_TASKS.filter(value => value.journal_id == journalId)
+    let tasks 
+    try {
+        tasks = await Task.find({journal_id: journalId}).populate("tasks")
+        console.log(tasks)
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the tasks", 500))
+    }
     // if tasks is undefined or length of tasks is empty
-    if (!tasks || tasks.length === 0){
+    if (!tasks){
         return next(new HttpError("Tasks not found", 404))
     }
+    console.log(tasks)
     // send response
-    res.status(200).json(tasks)
+    res.status(200).json({tasks: tasks.map(task => task.toObject({getters: true}))})
 }
 
 // GET all tasks by user id
-const getAllTasksByUserId = (req, res, next) => {
+const getAllTasksByUserId = async(req, res, next) => {
     const userId = req.params.uid
 
     // filter dummy data
-    const tasks = DUMMY_TASKS.filter(value => value.user_id == userId)
+    let tasks 
+    try {
+        tasks = await Task.find({user_id: userId}).populate("tasks")
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the tasks", 500))
+    }
     // if tasks is undefined or length of tasks is empty
-    if (!tasks || tasks.length === 0){
+    if (!tasks){
         return next(new HttpError("Tasks not found", 404))
     }
     // send response
-    res.status(200).json(tasks)
+    res.status(200).json({tasks: tasks.map(task => task.toObject({getters: true}))})
 }
 
 // CREATE task
-const createTask = (req,res,next) => {
+const createTask = async(req,res,next) => {
     const errors = validationResult(req).formatWith(errorFormatter)
     const hasErrors = !errors.isEmpty()
 
@@ -106,15 +134,50 @@ const createTask = (req,res,next) => {
     const {title, description, journal_id, user_id} = req.body
 
     // creat new task data
-    const createdTask = {
-        id: uuidv4(),
+    const createdTask = new Task({
         title,
         description,
         journal_id,
         user_id
+    })
+
+    // check if user id and journal id exists
+    let user 
+    try {
+        user = await User.findById(user_id)
+    } catch (error) {
+        return next(HttpError("Something went wrong in accessing the user.", 500))
+    } 
+
+    if (!user){
+        return next(HttpError("User not found.",404))
     }
 
+    let journal 
+    try {
+        journal = await Journal.findById(journal_id)
+    } catch (error) {
+        return next(HttpError("Something went wrong in accessing the journal.", 500))
+    } 
+
+    if (!journal){
+        return next(HttpError("Journal not found.",404))
+    }
+
+    // if (user_id !== journa)
     // push to dummy data
+    try {
+        const sess = await mongoose.startSession()
+        sess.startTransaction()
+
+        await createdTask.save({session:sess})
+        journal.tasks.push(createdTask)
+        await journal.save({session:sess})
+
+        sess.commitTransaction()
+    } catch (error) {
+        return next(HttpError("Something went wrong in saving the task.", 500))
+    }
     DUMMY_TASKS.push(createdTask)
     // send response
     res.status(201).json({...createdTask})

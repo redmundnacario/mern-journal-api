@@ -1,26 +1,47 @@
 const express = require('express')
 const {check} = require('express-validator')
-const HttpError = require('../models/error')
 
-const router = express.Router()
+//middlewares
+const auth = require('../middlewares/auth')
 
 const tasksControllers = require("../controllers/tasks.controllers")
 
-// get all
-router.get("/", tasksControllers.getAllTasks)
 
-// get task by task id
-router.get("/:tid",  tasksControllers.getTaskById)
 
-// get task by journal id
-router.get("/journal/:jid", tasksControllers.getAllTasksByJournalId)
+const router = express.Router()
 
-// get task by userid
-router.get("/user/:uid", tasksControllers.getAllTasksByUserId)
 
-// create
+// @route   GET /tasks/
+// @desc    Get all tasks
+// @access  Private 
+// @level   User
+router.get("/", auth, tasksControllers.getAllTasks)
+
+// @route   GET /tasks/:tid
+// @desc    Get a journal by single id
+// @access  Private 
+// @level   User
+router.get("/:tid", auth,  tasksControllers.getTaskById)
+
+// @route   GET /tasks/journal/:jid
+// @desc    Get tasks by single journal id
+// @access  Private 
+// @level   User
+router.get("/journal/:jid", auth, tasksControllers.getAllTasksByJournalId)
+
+// @route   GET /tasks/user/:uid
+// @desc    Get tasks by single user id
+// @access  Private 
+// @level   User
+router.get("/user/:uid", auth, tasksControllers.getAllTasksByUserId)
+
+// @route   POST /tasks/
+// @desc    Create a new task
+// @access  Private 
+// @level   User
 router.post("/",
-            [
+            [   
+                auth,
                 check('title').not().isEmpty(),
                 check('description').isLength({min:10}),
                 check('journal_id').not().isEmpty(),
@@ -30,7 +51,8 @@ router.post("/",
 
 // edit
 router.patch("/:tid",
-            [
+            [   
+                auth,
                 check('title').not().isEmpty(),
                 check('description').isLength({min:10})
             ],

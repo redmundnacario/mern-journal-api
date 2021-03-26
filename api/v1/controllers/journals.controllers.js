@@ -1,31 +1,12 @@
 const { v4: uuidv4 }  = require('uuid')
 const { validationResult } = require("express-validator")
+const mongoose = require('mongoose')
 
+//models
+const Journal = require('../models/journals.model')
+const Task = require('../models/tasks.model')
+const User = require('../models/users.model')
 const HttpError = require('../models/error');
-
-let DUMMY_JOURNALS = [
-    {
-        id: 1,
-        title: "Journal1",
-        description: " Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        user_id: 1,
-        tasks: []
-    },
-    {
-        id:2,
-        title: "Journal2",
-        description: " Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        user_id: 1,
-        tasks: []
-    },
-    {
-        id:3,
-        title: "Journal2",
-        description: " Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        user_id: 2,
-        tasks: []
-    },
-]
 
 const errorFormatter = ({ location, msg, param, value, nestedErrors }) => {
     // Build your resulting errors however you want! String, object, whatever - it works!
@@ -51,39 +32,62 @@ const errorArrayFormater = (errorMap) => {
     return errors
 }
 
+
+
+
 // Get all Journals
-const getAllJournals =(req, res, next) => {
-    res.status(200).json(DUMMY_JOURNALS)
+const getAllJournals = async(req, res, next) => {
+    let journals
+    try {
+        journals = await Journal.find()
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the Journals. Try again.", 500))
+    }
+
+    res.status(200).json({journals: journals.map(journal => journal.toObject({getters:true}))})
 }
 // GET journal by id
-const getJournalById = (req, res, next) => {
+const getJournalById = async(req, res, next) => {
     const journalId = req.params.jid
     // find journal
-    const hasJournal = DUMMY_JOURNALS.find(value => value.id == journalId )
+    let journal
+    try {
+        console.log(journalId)
+        journal = await Journal.findById(journalId)
+    } catch (error) {
+        console.log(error)
+        return next(new HttpError("Something went wrong in accessing the Journal. Try again.", 500))
+    }
     // if journals is undefined or missing
-    if (!hasJournal){
-        return next(new HttpError("Journal not found", 404))
+    if (!journal){
+        return next(new HttpError("Journal not found.", 404))
     }
     //send response
-    res.status(200).json({...hasJournal})
+    res.status(200).json({journal : journal.toObject({getters:true})})
 }
 
 // GET all journals by userid
-const getAllJournalsByUserId = (req, res, next) => {
+const getAllJournalsByUserId = async(req, res, next) => {
     const userId = req.params.uid
 
     // filter dummy data
-    const journals = DUMMY_JOURNALS.filter(value => value.user_id == userId)
+    let journals
+    try {
+        journals = await Journal.find({user_id: userId}).populate('journals')
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the Journal.", 500))
+    }
+
     // if journals is undefined or length of journals is empty
-    if (!journals || journals.length === 0){
-        return next(new HttpError("Users journals not found", 404))
+    if (!journals){
+        return next(new HttpError("User's journals not found.", 404))
     }
     // send response
-    res.status(200).json(journals)
+    res.status(200).json({journals: journals.map(journal => journal.toObject({getters:true}))})
 }
 
 // CREATE journal
-const createJournal = (req,res,next) => {
+const createJournal = async(req,res,next) => {
 
     const errors = validationResult(req).formatWith(errorFormatter)
     const hasErrors = !errors.isEmpty()
@@ -95,18 +99,42 @@ const createJournal = (req,res,next) => {
     const {title, description, user_id} = req.body
 
     // creat new journal data
-    const createdJournal = {
-        id: uuidv4(),
+    const createdJournal = new Journal({
         title,
         description,
         user_id,
         tasks : []
+    })
+
+    // check if user exist
+    let user 
+    try {
+        user = await User.findById(user_id)
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the user.", 500))
+    } 
+
+    if (!user){
+        return next(new HttpError("User not found.",404))
     }
 
-    // push to dummy data
-    DUMMY_JOURNALS.push(createdJournal)
+    // when updating two tables/document, needs session
+    // advantage is to rollback if place creation failed or user update failed
+    try {
+        const sess = await mongoose.startSession()
+        sess.startTransaction()
+
+        await createdJournal.save({session:sess})
+        user.journals.push(createdJournal)
+        await user.save({session:sess})
+
+        await sess.commitTransaction();
+    } catch (error) {
+        console.log(error)
+        return next( new HttpError("Creating Journal failed. Try again.", 500))
+    }
     // send response
-    res.status(201).json({...createdJournal})
+    res.status(201).json({journal: createdJournal.toObject({getters:true})})
 }
 
 // EDIT Journal

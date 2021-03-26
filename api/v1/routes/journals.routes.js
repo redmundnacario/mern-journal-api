@@ -2,41 +2,64 @@ const express = require('express')
 const HttpError = require('../models/error')
 const { check } = require('express-validator')
 
-const router = express.Router()
+//middlewares
+const auth = require('../middlewares/auth')
 
 const journalsControllers = require('../controllers/journals.controllers')
 
 
-router.get("/", journalsControllers.getAllJournals)
 
-// get journal by id
-router.get("/:jid", journalsControllers.getJournalById)
-
-// get all journals by a user id
-router.get("/user/:uid", journalsControllers.getAllJournalsByUserId)
+const router = express.Router()
 
 
-// create
+
+// @route   GET /journals/
+// @desc    Get all journals
+// @access  Private 
+// @level   User
+router.get("/", auth, journalsControllers.getAllJournals)
+
+// @route   GET /journals/:jid
+// @desc    Get a journal by single id
+// @access  Private 
+// @level   User
+router.get("/:jid", auth, journalsControllers.getJournalById)
+
+
+// @route   GET /journals/user/:uid
+// @desc    Get all journals of a single User id
+// @access  Private 
+// @level   User
+router.get("/user/:uid", auth, journalsControllers.getAllJournalsByUserId)
+
+
+// @route   GET /
+// @desc    Get all journals
+// @access  Private 
+// @level   User
 router.post("/", 
-            [
+            [   
+                auth,
                 check('title').not().isEmpty(),
                 check('description').isLength({min:10}),
                 check('user_id').not().isEmpty(),
             ],
             journalsControllers.createJournal)
 
-// edit
+// @route   GET /
+// @desc    Get all journals
+// @access  Private 
+// @level   User
 router.patch("/:jid", 
-            [
+            [   
+                auth,
                 check('title').not().isEmpty(),
                 check('description').isLength({min:10})
             ],
             journalsControllers.editJournal)
 
-//update
-// router.put("/:jid", journalsControllers.updateJournal)
 
 //delete
-router.delete("/:jid", journalsControllers.deleteJournal)
+router.delete("/:jid", auth, journalsControllers.deleteJournal)
 
 module.exports = router

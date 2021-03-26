@@ -5,6 +5,9 @@ const bodyParser = require('body-parser');
 const connectDB = require('./config/db')
 connectDB()
 
+///helpers
+const {demoLogger} = require('./helpers');
+
 // active version
 const ACTIVE_VERSION = "/api/v1"
 
@@ -12,6 +15,7 @@ const ACTIVE_VERSION = "/api/v1"
 const HttpError = require(`.${ACTIVE_VERSION}/models/error`)
 
 // routes
+const authRoutes = require(`.${ACTIVE_VERSION}/routes/auth.routes`)
 const usersRoutes = require(`.${ACTIVE_VERSION}/routes/users.routes`)
 const journalsRoutes = require(`.${ACTIVE_VERSION}/routes/journals.routes`)
 const tasksRoutes = require(`.${ACTIVE_VERSION}/routes/tasks.routes`)
@@ -23,7 +27,11 @@ const PORT = 5000
 //body paraser for json
 app.use(bodyParser.json())
 
+// logs
+app.use(demoLogger)
+
 // assign routes
+app.use(`${ACTIVE_VERSION}/auth`, authRoutes);
 app.use(`${ACTIVE_VERSION}/users`, usersRoutes);
 app.use(`${ACTIVE_VERSION}/journals`, journalsRoutes);
 app.use(`${ACTIVE_VERSION}/tasks`, tasksRoutes);
