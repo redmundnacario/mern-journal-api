@@ -1,5 +1,5 @@
 const { validationResult } = require('express-validator')
-
+const mongoose = require("mongoose")
 
 // model
 const User = require('../models/users.model')
@@ -58,34 +58,6 @@ const getUserbyId = async(req,res,next) => {
 // @route   PATCH /users/:uid
 // @desc    edit current single user
 // @access  Private
-const editCurrentUser = async(req, res, next) => {
-
-    const errors = validationResult(req).formatWith(errorFormatter)
-    const hasErrors = !errors.isEmpty()
-
-    if (hasErrors){
-        return next(new HttpError(errorArrayFormater(errors.array({ onlyFirstError: true })), 422))
-    }
-
-    const attributesToChange = req.body
-    const userId = req.user.id
-
-    // update user
-    let result
-    try {
-        attributesToChange.date_updated = Date.now()
-        result = await User.findByIdAndUpdate(userId, attributesToChange, { new: true }).select("-password");
-    } catch (error){
-        return next( new HttpError("Updating user failed. Try again.", 500))
-    }
-
-    res.status(200).json({user: result.toObject({getters: true})})
-    // .json({user: userToBeUpdated.toObject({getters:true})})
-}
-
-// @route   PATCH /users/:uid
-// @desc    edit current single user
-// @access  Private
 const editUser = async(req, res, next) => {
 
     const errors = validationResult(req).formatWith(errorFormatter)
@@ -131,11 +103,35 @@ const editUser = async(req, res, next) => {
 // @route   DELETE /users/:uid
 // @desc    Remove current single user and its contents in other tables
 // @access  Private
+const deleteUser = async(req, res, next) => {
+    const userId = req.params.uid
 
+    // find user
+    let user 
+    try {
+        user = await User.findById(userId)
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the user.", 500))
+    }
+
+    if (!user){
+        return next(new HttpError("User not found.", 404))
+    }
+
+    // delete user
+    try {
+    
+        await user.remove()
+    } catch (error) {
+        return next(new HttpError("Deleting user failed. Try again.", 500))
+    }
+
+    res.status(200).json({message: "User deleted."})
+}
 
 
 
 exports.getUsers = getUsers
 exports.getUserbyId = getUserbyId
-exports.editCurrentUser = editCurrentUser
 exports.editUser = editUser
+exports.deleteUser = deleteUser

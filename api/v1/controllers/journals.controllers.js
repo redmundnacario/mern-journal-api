@@ -70,7 +70,7 @@ const getJournalById = async(req, res, next) => {
 const getAllJournalsByUserId = async(req, res, next) => {
     const userId = req.params.uid
 
-    // filter dummy data
+    // filter  data
     let journals
     try {
         journals = await Journal.find({user_id: userId}).populate('journals')
@@ -138,7 +138,7 @@ const createJournal = async(req,res,next) => {
 }
 
 // EDIT Journal
-const editJournal = (req, res, next) => {
+const editJournal = async(req, res, next) => {
     const errors = validationResult(req).formatWith(errorFormatter)
     const hasErrors = !errors.isEmpty()
 
@@ -146,38 +146,64 @@ const editJournal = (req, res, next) => {
         return next(new HttpError(errorArrayFormater(errors.array()), 422))
     }
 
-    const { title, description } =req.body
+    const attributesToChange =req.body
     const journalId = req.params.jid
 
     // find journal
-    const hasJournal = DUMMY_JOURNALS.find( value => value.id == journalId )
-    
+    let journal
+    try {
+        journal = await Journal.findById(journalId)
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the journal.", 500))
+    }
+
     // if journals is undefined or missing
-    if (!hasJournal){
+    if (!journal){
         return next(new HttpError("Journal not found", 404))
     }
 
-    hasJournal.title = title
-    hasJournal.description = description
+    // update journal
+    try {
+        attributesToChange.date_update = Date.now()
+        journal = await Journal.findByIdAndUpdate(journalId, attributesToChange, { new: true })
+    } catch (error) {
+        return next( new HttpError("Updating journal failed. Try again.", 500))
+    }
 
-    res.status(200).json({...hasJournal})
+    res.status(200).json({journal: journal.toObject({getters:true})})
 
 }
 
 const deleteJournal = (req, res, next) => {
     const journalId = req.params.jid
 
-    const hasJournal = DUMMY_JOURNALS.find( value => value.id == journalId )
-    
+    // find journal
+    let journal
+    try {
+        journal = await Journal.findById(journalId)
+    } catch (error) {
+        return next(new HttpError("Something went wrong in accessing the journal.", 500))
+    }
+
     // if journals is undefined or missing
-    if (!hasJournal){
+    if (!journal){
         return next(new HttpError("Journal not found", 404))
     }
 
-    // console.log(placeId)
-    DUMMY_JOURNALS = DUMMY_JOURNALS.filter(value => value.id != journalId)
+    // Delete data from db
+    try{
+        const sess = await mongoose.startSession();
+        sess.startTransaction();
 
-    // console.log(DUMMY_JOURNALS)
+        await journal.remove({session: sess})
+        journal.user_id.journals.pull(journal)
+        await journal.user_id.save({session: sess});
+
+        await sess.commitTransaction();
+    } catch(err){
+        return next( new HttpError("Deleting journal failed. Try again.", 500))
+    }
+
     res.status(200).json({message: "Journal deleted."})
 }
 

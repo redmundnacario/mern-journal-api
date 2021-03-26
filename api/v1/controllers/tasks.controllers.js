@@ -184,7 +184,7 @@ const createTask = async(req,res,next) => {
 }
 
 // EDIT Task
-const editTask = (req, res, next) => {
+const editTask = async(req, res, next) => {
     const errors = validationResult(req).formatWith(errorFormatter)
     const hasErrors = !errors.isEmpty()
 
@@ -192,38 +192,62 @@ const editTask = (req, res, next) => {
         return next(new HttpError(errorArrayFormater(errors.array()), 422))
     }
     
-    const { title, description } = req.body
+    const attributesToChange = req.body
     const taskId = req.params.tid
 
     // find task
-    const hasTask = DUMMY_TASKS.find( value => value.id == taskId )
-    
-    // if task is undefined or missing
-    if (!hasTask){
-        return next(new HttpError("Task not found", 404))
+    let task
+    try {
+        task = await Task.findById(taskId)
+    } catch (error) {
+        return next(new HttpError("Something wrong in accessing the task. Try again",500))
     }
 
-    hasTask.title = title
-    hasTask.description = description
+    if (!task){
+        return next(new HttpError("Task not found", 404))
+    }
+    
+    // update taask
+    try {
+        attributesToChange.date_updated = Date.now()
+        task = await Task.findByIdAndUpdate(taskId, attributesToChange, {new:true})
+    } catch (error) {
+        return next(new HttpError("Updating task failed. Try again.", 500))
+    }
 
-    res.status(200).json({...hasTask})
+    res.status(200).json({task: task.toObject({getters:true})})
 
 }
 
 const deleteTask = (req, res, next) => {
     const taskId = req.params.tid
 
-    const hasTask = DUMMY_TASKS.find( value => value.id == taskId )
-    
-    // if journals is undefined or missing
-    if (!hasTask){
+    // find task
+    let task
+    try {
+        task = await Task.findById(taskId)
+    } catch (error) {
+        return next(new HttpError("Something wrong in accessing the task. Try again",500))
+    }
+
+    if (!task){
         return next(new HttpError("Task not found", 404))
     }
 
-    // console.log(placeId)
-    DUMMY_TASKS = DUMMY_TASKS.filter(value => value.id != taskId)
+    // Delete data from db
+    try{
+        const sess = await mongoose.startSession();
+        sess.startTransaction();
 
-    // console.log(DUMMY_TASKS)
+        await task.remove({session: sess})
+        task.journal_id.tasks.pull(task)
+        await task.journal_id.save({session: sess});
+
+        await sess.commitTransaction();
+    } catch(err){
+        return next( new HttpError("Deleting task failed. Try again.", 500))
+    }
+
     res.status(200).json({message: "Task deleted."})
 }
 

@@ -17,11 +17,13 @@ const router = express.Router()
 // @level   User
 router.get("/", auth, tasksControllers.getAllTasks)
 
+
 // @route   GET /tasks/:tid
 // @desc    Get a journal by single id
 // @access  Private 
 // @level   User
 router.get("/:tid", auth,  tasksControllers.getTaskById)
+
 
 // @route   GET /tasks/journal/:jid
 // @desc    Get tasks by single journal id
@@ -29,11 +31,13 @@ router.get("/:tid", auth,  tasksControllers.getTaskById)
 // @level   User
 router.get("/journal/:jid", auth, tasksControllers.getAllTasksByJournalId)
 
+
 // @route   GET /tasks/user/:uid
 // @desc    Get tasks by single user id
 // @access  Private 
 // @level   User
 router.get("/user/:uid", auth, tasksControllers.getAllTasksByUserId)
+
 
 // @route   POST /tasks/
 // @desc    Create a new task
@@ -49,7 +53,11 @@ router.post("/",
             ],
             tasksControllers.createTask)
 
-// edit
+
+// @route   PATCH /tasks/:tid
+// @desc    Edit task
+// @access  Private 
+// @level   User
 router.patch("/:tid",
             [   
                 auth,
@@ -58,10 +66,11 @@ router.patch("/:tid",
             ],
             tasksControllers.editTask)
 
-//update
-// router.put()
 
-//delete
+// @route   DELETE /tasks/:tid
+// @desc    Delete task
+// @access  Private 
+// @level   User
 router.delete("/:tid", tasksControllers.deleteTask)
 
 module.exports = router

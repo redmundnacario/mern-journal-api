@@ -13,7 +13,7 @@ const router = express.Router()
 
 
 
-// @route   GET /journals/
+// @route   GET /journals
 // @desc    Get all journals
 // @access  Private 
 // @level   User
@@ -33,8 +33,8 @@ router.get("/:jid", auth, journalsControllers.getJournalById)
 router.get("/user/:uid", auth, journalsControllers.getAllJournalsByUserId)
 
 
-// @route   GET /
-// @desc    Get all journals
+// @route   POST /journals
+// @desc    Create a Journal
 // @access  Private 
 // @level   User
 router.post("/", 
@@ -46,20 +46,23 @@ router.post("/",
             ],
             journalsControllers.createJournal)
 
-// @route   GET /
-// @desc    Get all journals
+// @route   PATCH /journals/:jid
+// @desc    Edit a Journal
 // @access  Private 
 // @level   User
 router.patch("/:jid", 
             [   
                 auth,
-                check('title').not().isEmpty(),
-                check('description').isLength({min:10})
+                check('title').optional().not().isEmpty(),
+                check('description').optional().isLength({min:10})
             ],
             journalsControllers.editJournal)
 
 
-//delete
+// @route   DELETE /journals/:jid
+// @desc    Edit a Journal
+// @access  Private 
+// @level   User
 router.delete("/:jid", auth, journalsControllers.deleteJournal)
 
 module.exports = router

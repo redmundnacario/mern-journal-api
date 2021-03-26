@@ -22,18 +22,6 @@ router.get("/", auth, usersControllers.getUsers)
 // @level   User
 router.get("/:uid", auth, usersControllers.getUserbyId)
 
-// @route   PATCH /users/
-// @desc    edit current single user
-// @access  Private
-// @level   User
-router.patch("/",
-            [
-                auth,
-                check("name").optional().exists(),
-                check("email").optional().normalizeEmail().isEmail(),
-                check("password").optional().isLength({min:7})
-            ],
-            usersControllers.editCurrentUser)
 
 // @route   PATCH /users/:uid
 // @desc    edit single user
@@ -52,6 +40,6 @@ router.patch("/:uid",
 // @route   DELETE /users/:uid
 // @desc    Remove current single user and its contents in other tables
 // @access  Private
-
+router.delete("/:uid", auth, usersControllers.deleteUser)
 
 module.exports = router
