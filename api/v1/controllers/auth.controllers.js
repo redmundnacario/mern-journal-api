@@ -19,9 +19,9 @@ const getAuthenticatedUser = async(req, res, next) =>{
     const userId = req.user.id
 
     let user;
-    try {
+    try { 
         // get all users, excluding the password attribute
-        user = await User.findById(userId).select("-password")
+        user = await User.findById(userId).select("-password -type -_id -__v")
     } catch(error){
         console.log(error)
         return next(new HttpError("Something went wrong in accessing the user. Try again.", 500))
@@ -45,10 +45,16 @@ const signIn = async(req,res,next) => {
         console.log(error)
         return next(new HttpError("Something went wrong. Try again.", 500))
     }
+    
+    if (!existingUser){
+        //throw error
+        const error =new HttpError("Credentials given are incorrect", 422)
+        return next(error )
+    }
 
     const match = await bcrypt.compare(password, existingUser.password);
-    
-    if (!existingUser || !match){
+
+    if (!match){
         //throw error
         const error =new HttpError("Credentials given are incorrect", 422)
         return next(error )
@@ -56,7 +62,8 @@ const signIn = async(req,res,next) => {
 
     const payload = {
         user: {
-            id: existingUser.id
+            id: existingUser.id,
+            type: existingUser.type
         }
     }
 
@@ -115,7 +122,8 @@ const signUp = async(req,res,next) => {
 
     const payload = {
         user: {
-            id: createdUser.id
+            id: createdUser.id,
+            type: createdUser.type
         }
     }
 

@@ -19,4 +19,13 @@ const auth = (req, res, next) => {
 	}
 }
 
-module.exports = auth
+// Checks if user is Admin, if not, invoke unauthorized access
+const checkLevel = (req, res, next) => {
+	if (req.user.type !== 'admin'){
+		return next(new HttpError('Unauthorized access denied. No admin privileges.', 401))
+	}
+	next()
+}
+
+exports.auth = auth
+exports.checkLevel = checkLevel

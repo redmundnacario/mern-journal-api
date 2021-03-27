@@ -174,7 +174,7 @@ const editJournal = async(req, res, next) => {
 
 }
 
-const deleteJournal = (req, res, next) => {
+const deleteJournal = async(req, res, next) => {
     const journalId = req.params.jid
 
     // find journal

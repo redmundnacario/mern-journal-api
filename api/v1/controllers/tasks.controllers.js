@@ -219,7 +219,7 @@ const editTask = async(req, res, next) => {
 
 }
 
-const deleteTask = (req, res, next) => {
+const deleteTask = async(req, res, next) => {
     const taskId = req.params.tid
 
     // find task

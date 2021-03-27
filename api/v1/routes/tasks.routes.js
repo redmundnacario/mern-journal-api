@@ -2,7 +2,7 @@ const express = require('express')
 const {check} = require('express-validator')
 
 //middlewares
-const auth = require('../middlewares/auth')
+const {auth, checkLevel} = require('../middlewares/auth')
 
 const tasksControllers = require("../controllers/tasks.controllers")
 

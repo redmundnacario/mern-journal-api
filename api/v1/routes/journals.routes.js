@@ -3,7 +3,7 @@ const HttpError = require('../models/error')
 const { check } = require('express-validator')
 
 //middlewares
-const auth = require('../middlewares/auth')
+const {auth, checkLevel} = require('../middlewares/auth')
 
 const journalsControllers = require('../controllers/journals.controllers')
 

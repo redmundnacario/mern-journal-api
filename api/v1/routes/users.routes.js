@@ -2,7 +2,7 @@ const express = require('express')
 const { check } = require('express-validator')
 
 //middlewares
-const auth = require('../middlewares/auth')
+const {auth, checkLevel} = require('../middlewares/auth')
 const usersControllers = require('../controllers/users.controllers')
 
 
@@ -14,20 +14,20 @@ const router = express.Router()
 // @desc    Get all users
 // @access  Private 
 // @level   Admin
-router.get("/", auth, usersControllers.getUsers)
+router.get("/", auth, checkLevel, usersControllers.getUsers)
 
 // @route   GET /users/:uid
 // @desc    Get a single user
 // @access  Private
 // @level   User
-router.get("/:uid", auth, usersControllers.getUserbyId)
+router.get("/:id", auth, usersControllers.getUserbyId)
 
 
 // @route   PATCH /users/:uid
 // @desc    edit single user
 // @access  Private
-// @level   Admin
-router.patch("/:uid",
+// @level   User
+router.patch("/:id",
             [
                 auth,
                 check("name").optional().exists(),
@@ -40,6 +40,6 @@ router.patch("/:uid",
 // @route   DELETE /users/:uid
 // @desc    Remove current single user and its contents in other tables
 // @access  Private
-router.delete("/:uid", auth, usersControllers.deleteUser)
+router.delete("/:id", auth, usersControllers.deleteUser)
 
 module.exports = router
