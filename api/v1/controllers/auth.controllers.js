@@ -21,7 +21,7 @@ const getAuthenticatedUser = async(req, res, next) =>{
     let user;
     try { 
         // get all users, excluding the password attribute
-        user = await User.findById(userId).select("-password -type -_id -__v")
+        user = await User.findById(userId).select("-password -type")
     } catch(error){
         console.log(error)
         return next(new HttpError("Something went wrong in accessing the user. Try again.", 500))

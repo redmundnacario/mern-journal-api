@@ -3,28 +3,14 @@ const mongoose = require("mongoose")
 
 // model
 const User = require('../models/users.model')
+const Journal = require('../models/journals.model')
+const Task = require('../models/tasks.model')
 const HttpError = require('../models/error')
 
 // helpers
-const {errorFormatter, errorArrayFormater} = require('../helpers/helpers')
+const {errorFormatter, errorArrayFormater, checkCurrentUser} = require('../helpers/helpers')
+const { getAllTasksByUserId } = require('./tasks.controllers')
 
-
-// check if user id
-const checkCurrentUser = (reqUser, userParamsId) => {
-    const userId = reqUser.id
-    const type = reqUser.type
-    console.log("admin?", type === 'admin', type)
-    console.log("not same user?", userId !== userParamsId , userId, userParamsId)
-
-    if (type === "admin"){
-        return
-    }
-
-	if (userId !== userParamsId ){
-		const error = new HttpError('Unauthorized access denied. User does not match.', 401)
-        return error
-	}
-}
 
 
 // @route   GET /users/
@@ -59,6 +45,11 @@ const getUsers = async(req,res,next) => {
 const getUserbyId = async(req,res,next) => {
     const userId = req.params.id
 
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, userId)
+    if (checkError) { 
+        return next(checkError)}
+
     let user;
     try {
         // get all users, excluding the password attribute
@@ -91,10 +82,9 @@ const editUser = async(req, res, next) => {
     const attributesToChange = req.body
     const userId = req.params.id
 
-    // check if user is admin or current user
+    // check if user is admin or current user , if not invoke error
     const checkError = checkCurrentUser(req.user, userId)
     if (checkError) { 
-        console.log(checkError)
         return next(checkError)}
 
     //check if user exist
@@ -132,8 +122,10 @@ const editUser = async(req, res, next) => {
 const deleteUser = async(req, res, next) => {
     const userId = req.params.id
 
-    // check if user is admin or current user
-    checkCurrentUser(req.user, userId)
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, userId)
+    if (checkError) { 
+        return next(checkError)}
 
     // find user
     let user 
@@ -147,10 +139,17 @@ const deleteUser = async(req, res, next) => {
         return next(new HttpError("User not found.", 404))
     }
 
+    
+
     // delete user
     try {
+        const sess = await mongoose.startSession();
+        sess.startTransaction();
     
-        await user.remove()
+        await user.remove({session:sess})
+        await Journal.deleteMany({user_id: userId})
+        await Task.deleteMany({user_id: userId})
+        await sess.commitTransaction();
     } catch (error) {
         console.log(error)
         return next(new HttpError("Deleting user failed. Try again.", 500))

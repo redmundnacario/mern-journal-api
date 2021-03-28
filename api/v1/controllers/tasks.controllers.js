@@ -5,59 +5,16 @@ const mongoose = require('mongoose')
 
 // models
 const Task = require('../models/tasks.model')
+const Journal = require('../models/journals.model')
+const User = require('../models/users.model')
 
-let DUMMY_TASKS = [
-    {
-        id: 1,
-        title: "Task 1",
-        description: " Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        user_id: 1,
-        journal_id: 1,
-    },
-    {
-        id:2,
-        title: "Task 2",
-        description: " Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        user_id: 1,
-        journal_id: 1,
-    },
-    {
-        id:3,
-        title: "task 3",
-        description: " Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        user_id: 2,
-        journal_id: 2,
-    },
-]
-
-const errorFormatter = ({ location, msg, param, value, nestedErrors }) => {
-    // Build your resulting errors however you want! String, object, whatever - it works!
-    // return `${location}[${param}]: ${msg}`;
-    if (value == null){
-        return `The '${param}' from the input data is not defined or missing.`;
-    } else if (param === "description" && value.length < 10){
-        return `The length of '${param}' should be greater than 9 characters.`;
-    } else {
-        return `${msg} '${value}' in ${param}`;
-    }
-};
-
-const errorArrayFormater = (errorMap) => {
-    errors = ""
-    for (const error of errorMap) {
-        if (errors == ""){
-            errors = errors + error
-        } else {
-            errors = errors + ". " + error
-        }
-    }
-    return errors
-}
+// helpers
+const {errorFormatter, errorArrayFormater, checkCurrentUser} = require('../helpers/helpers')
 
 const getAllTasks = async(req, res, next) => {
     let tasks
     try {
-        tasks = await Task.find()
+        tasks = await Task.find({})
     } catch (error) {
         return next(HttpError("Something went wrong in accessing the tasks.",500))
     }
@@ -78,6 +35,13 @@ const getTaskById = async(req, res, next) => {
     if (!task){
         return next(new HttpError("Task not found", 404))
     }
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, task.user_id.toString())
+    if (checkError) { 
+        return next(checkError)}
+
+
     //send response
     res.status(200).json({task: task.toObject({getters:true})})
 }
@@ -86,11 +50,34 @@ const getTaskById = async(req, res, next) => {
 const getAllTasksByJournalId = async(req, res, next) => {
     const journalId = req.params.jid
 
+    //  get journal
+
+    let journal
+    try {
+        console.log(journalId)
+        journal = await Journal.findById(journalId)
+    } catch (error) {
+        console.log(error)
+        return next(new HttpError("Something went wrong in accessing the Journal. Try again.", 500))
+    }
+    // if journals is undefined or missing
+    if (!journal){
+        return next(new HttpError("Journal not found.", 404))
+    }
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, journal.user_id.toString())
+    if (checkError) { 
+        return next(checkError)
+    }
+
+
     // filter dummy data
     let tasks 
     try {
+
         tasks = await Task.find({journal_id: journalId}).populate("tasks")
-        console.log(tasks)
+        
     } catch (error) {
         return next(new HttpError("Something went wrong in accessing the tasks", 500))
     }
@@ -98,7 +85,8 @@ const getAllTasksByJournalId = async(req, res, next) => {
     if (!tasks){
         return next(new HttpError("Tasks not found", 404))
     }
-    console.log(tasks)
+
+    
     // send response
     res.status(200).json({tasks: tasks.map(task => task.toObject({getters: true}))})
 }
@@ -118,6 +106,13 @@ const getAllTasksByUserId = async(req, res, next) => {
     if (!tasks){
         return next(new HttpError("Tasks not found", 404))
     }
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, userId)
+    if (checkError) { 
+        return next(checkError)}
+
+
     // send response
     res.status(200).json({tasks: tasks.map(task => task.toObject({getters: true}))})
 }
@@ -131,14 +126,15 @@ const createTask = async(req,res,next) => {
         return next(new HttpError(errorArrayFormater(errors.array()), 422))
     }
 
-    const {title, description, journal_id, user_id} = req.body
-
+    const {title, description, journal_id, user_id, deadline} = req.body
+    console.log(req.body)
     // creat new task data
     const createdTask = new Task({
         title,
         description,
         journal_id,
-        user_id
+        user_id,
+        deadline
     })
 
     // check if user id and journal id exists
@@ -146,22 +142,27 @@ const createTask = async(req,res,next) => {
     try {
         user = await User.findById(user_id)
     } catch (error) {
-        return next(HttpError("Something went wrong in accessing the user.", 500))
+        return next(new HttpError("Something went wrong in accessing the user.", 500))
     } 
 
     if (!user){
-        return next(HttpError("User not found.",404))
+        return next(new HttpError("User not found.",404))
     }
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, user.id.toString())
+    if (checkError) { 
+        return next(checkError)}
 
     let journal 
     try {
-        journal = await Journal.findById(journal_id)
+        journal = await Journal.findById(journal_id).populate('tasks')
     } catch (error) {
-        return next(HttpError("Something went wrong in accessing the journal.", 500))
+        return next(new HttpError("Something went wrong in accessing the journal.", 500))
     } 
 
     if (!journal){
-        return next(HttpError("Journal not found.",404))
+        return next(new HttpError("Journal not found.",404))
     }
 
     // if (user_id !== journa)
@@ -176,11 +177,10 @@ const createTask = async(req,res,next) => {
 
         sess.commitTransaction()
     } catch (error) {
-        return next(HttpError("Something went wrong in saving the task.", 500))
+        return next(new HttpError("Something went wrong in saving the task.", 500))
     }
-    DUMMY_TASKS.push(createdTask)
     // send response
-    res.status(201).json({...createdTask})
+    res.status(201).json({task: createdTask.toObject({getters:true})})
 }
 
 // EDIT Task
@@ -206,6 +206,11 @@ const editTask = async(req, res, next) => {
     if (!task){
         return next(new HttpError("Task not found", 404))
     }
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, task.user_id.toString())
+    if (checkError) { 
+        return next(checkError)}
     
     // update taask
     try {
@@ -225,7 +230,7 @@ const deleteTask = async(req, res, next) => {
     // find task
     let task
     try {
-        task = await Task.findById(taskId)
+        task = await Task.findById(taskId).populate("journal_id")
     } catch (error) {
         return next(new HttpError("Something wrong in accessing the task. Try again",500))
     }
@@ -233,6 +238,12 @@ const deleteTask = async(req, res, next) => {
     if (!task){
         return next(new HttpError("Task not found", 404))
     }
+
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, task.user_id.toString())
+    if (checkError) { 
+        return next(checkError)}
 
     // Delete data from db
     try{

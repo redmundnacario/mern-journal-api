@@ -16,8 +16,8 @@ const router = express.Router()
 // @route   GET /journals
 // @desc    Get all journals
 // @access  Private 
-// @level   User
-router.get("/", auth, journalsControllers.getAllJournals)
+// @level   Admin
+router.get("/", auth, checkLevel, journalsControllers.getAllJournals)
 
 // @route   GET /journals/:jid
 // @desc    Get a journal by single id

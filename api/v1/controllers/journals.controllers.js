@@ -8,30 +8,8 @@ const Task = require('../models/tasks.model')
 const User = require('../models/users.model')
 const HttpError = require('../models/error');
 
-const errorFormatter = ({ location, msg, param, value, nestedErrors }) => {
-    // Build your resulting errors however you want! String, object, whatever - it works!
-    // return `${location}[${param}]: ${msg}`;
-    if (value == null){
-        return `The '${param}' from the input data is not defined or missing.`;
-    } else if (param === "description" && value.length < 10){
-        return `The length of '${param}' should be greater than 9 characters.`;
-    } else {
-        return `${msg} '${value}' in ${param}`;
-    }
-};
-
-const errorArrayFormater = (errorMap) => {
-    errors = ""
-    for (const error of errorMap) {
-        if (errors == ""){
-            errors = errors + error
-        } else {
-            errors = errors + ". " + error
-        }
-    }
-    return errors
-}
-
+// helpers
+const {errorFormatter, errorArrayFormater, checkCurrentUser} = require('../helpers/helpers')
 
 
 
@@ -62,6 +40,13 @@ const getJournalById = async(req, res, next) => {
     if (!journal){
         return next(new HttpError("Journal not found.", 404))
     }
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, journal.user_id.toString())
+    if (checkError) { 
+        return next(checkError)}
+
+
     //send response
     res.status(200).json({journal : journal.toObject({getters:true})})
 }
@@ -69,6 +54,11 @@ const getJournalById = async(req, res, next) => {
 // GET all journals by userid
 const getAllJournalsByUserId = async(req, res, next) => {
     const userId = req.params.uid
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, userId)
+    if (checkError) { 
+        return next(checkError)}
 
     // filter  data
     let journals
@@ -118,6 +108,11 @@ const createJournal = async(req,res,next) => {
         return next(new HttpError("User not found.",404))
     }
 
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, user.id.toString())
+    if (checkError) { 
+        return next(checkError)}
+
     // when updating two tables/document, needs session
     // advantage is to rollback if place creation failed or user update failed
     try {
@@ -126,6 +121,7 @@ const createJournal = async(req,res,next) => {
 
         await createdJournal.save({session:sess})
         user.journals.push(createdJournal)
+        user.date_updated = Date.now()
         await user.save({session:sess})
 
         await sess.commitTransaction();
@@ -162,9 +158,14 @@ const editJournal = async(req, res, next) => {
         return next(new HttpError("Journal not found", 404))
     }
 
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, journal.user_id.toString())
+    if (checkError) { 
+        return next(checkError)}
+
     // update journal
     try {
-        attributesToChange.date_update = Date.now()
+        attributesToChange.date_updated = Date.now()
         journal = await Journal.findByIdAndUpdate(journalId, attributesToChange, { new: true })
     } catch (error) {
         return next( new HttpError("Updating journal failed. Try again.", 500))
@@ -180,7 +181,7 @@ const deleteJournal = async(req, res, next) => {
     // find journal
     let journal
     try {
-        journal = await Journal.findById(journalId)
+        journal = await Journal.findById(journalId).populate('user_id')
     } catch (error) {
         return next(new HttpError("Something went wrong in accessing the journal.", 500))
     }
@@ -190,17 +191,41 @@ const deleteJournal = async(req, res, next) => {
         return next(new HttpError("Journal not found", 404))
     }
 
-    // Delete data from db
+    let tasks
+    try {
+        tasks = await Task.find({journal_id: journalId})
+    } catch(error){
+        return next(new HttpError("Something went wrong in accessing tasks in journal", 500))
+    }
+    // console.log(tasks)
+
+    // check if user is admin or current user , if not invoke error
+    const checkError = checkCurrentUser(req.user, journal.user_id.id.toString())
+    if (checkError) { 
+        return next(checkError)}
+    //Delete data from db
     try{
         const sess = await mongoose.startSession();
         sess.startTransaction();
+        if (tasks){
+            try {
+                tasks.forEach(async(task) =>{
+                    await task.remove({session:sess})
+                })
+            } catch (error){
+                console.log(error)
+                return next(new HttpError("Deleting tasks within journal failed. Try again.", 500))
+            }
+        }
 
         await journal.remove({session: sess})
         journal.user_id.journals.pull(journal)
+
         await journal.user_id.save({session: sess});
 
         await sess.commitTransaction();
     } catch(err){
+        console.log(err)
         return next( new HttpError("Deleting journal failed. Try again.", 500))
     }
 

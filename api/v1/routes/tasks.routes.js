@@ -14,8 +14,8 @@ const router = express.Router()
 // @route   GET /tasks/
 // @desc    Get all tasks
 // @access  Private 
-// @level   User
-router.get("/", auth, tasksControllers.getAllTasks)
+// @level   Admin
+router.get("/", auth, checkLevel, tasksControllers.getAllTasks)
 
 
 // @route   GET /tasks/:tid
@@ -50,6 +50,7 @@ router.post("/",
                 check('description').isLength({min:10}),
                 check('journal_id').not().isEmpty(),
                 check('user_id').not().isEmpty(),
+                check('deadline').not().isEmpty(),
             ],
             tasksControllers.createTask)
 
@@ -61,8 +62,9 @@ router.post("/",
 router.patch("/:tid",
             [   
                 auth,
-                check('title').not().isEmpty(),
-                check('description').isLength({min:10})
+                check('title').optional().not().isEmpty(),
+                check('description').optional().isLength({min:10}),
+                check('deadline').optional().not().isEmpty(),
             ],
             tasksControllers.editTask)
 
@@ -71,6 +73,6 @@ router.patch("/:tid",
 // @desc    Delete task
 // @access  Private 
 // @level   User
-router.delete("/:tid", tasksControllers.deleteTask)
+router.delete("/:tid",auth, tasksControllers.deleteTask)
 
 module.exports = router
